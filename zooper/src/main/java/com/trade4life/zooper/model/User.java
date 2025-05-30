@@ -1,9 +1,18 @@
 package com.trade4life.zooper.model;
 
+import jakarta.persistence.*;
+import org.hibernate.id.factory.internal.AutoGenerationTypeStrategy;
+
+@Entity
 public class User {
+    @Id
+    @GeneratedValue(strategy= GenerationType.IDENTITY)
     private long id;
+    @Column(name = "email", nullable = false)
     private String email;
+    @Column(name = "username", nullable = false)
     private String username;
+    @Column(name = "password", nullable = false)
     private String password;
 
     public long getId() {
