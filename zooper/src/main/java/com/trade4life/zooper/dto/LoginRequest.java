@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 
 public class LoginRequest {
     @NotBlank(message="Username or Email is required")
-    @Email(message = "Username or Email should be valid")
     private String usernameOrEmail;
 
     @NotBlank(message="Password is required")

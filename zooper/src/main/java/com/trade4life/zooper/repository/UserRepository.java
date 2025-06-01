@@ -12,10 +12,10 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @Query(value = "SELECT * from User WHERE u.email = :email", nativeQuery = true)
+    @Query(value = "SELECT * from User WHERE email = :email", nativeQuery = true)
     Optional<User> findByEmail(@Param("email") String email);
 
-    @Query(value = "SELECT * from User WHERE u.username = :username", nativeQuery = true)
+    @Query(value = "SELECT * from User WHERE username = :username", nativeQuery = true)
     Optional<User> findByUsername(@Param("username") String username);
 
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email")

@@ -14,10 +14,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import com.trade4life.zooper.dto.LoginRequest;
 
 @RestController
@@ -33,14 +30,13 @@ public class UserController {
     @Autowired
     JwtUtils jwtUtils;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
 
     @PostMapping("/auth/signup")
     public ResponseEntity<?> userSignUp(@Valid @RequestBody SignupRequest signupRequest) {
         try{
             User user = userService.registerUser(signupRequest);
+            System.out.println(user.getEmail() + " : "+ user.getUsername() + " : " + signupRequest.getPassword());
+
             return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
         } catch(RuntimeException e){
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
@@ -48,9 +44,9 @@ public class UserController {
     }
 
     @PostMapping("/auth/login")
-    public String userLogIn(@Valid @RequestBody LoginRequest loginRequest){
+    public ResponseEntity<?> userLogIn(@Valid @RequestBody LoginRequest loginRequest){
         User user = userService.findByUsernameOrEmail(loginRequest.getUsernameOrEmail());
-        Authentication authentication = authenticationManager.authenticate( new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
+        Authentication authentication = authenticationManager.authenticate( new UsernamePasswordAuthenticationToken(user.getUsername(), loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(user.getUsername());
