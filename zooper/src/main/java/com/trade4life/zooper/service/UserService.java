@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -34,6 +35,9 @@ public class UserService{
         if(userRepository.existsByUsername(signupRequest.getUsername())){
             throw new RuntimeException("A user with this username already exists!");
         }
+
+        String a = passwordEncoder.encode("admin123");
+        System.out.println("admin pass: admin123 + " + a );
 
         User user = new User();
         user.setEmail(signupRequest.getEmail());
@@ -89,5 +93,9 @@ public class UserService{
 
         user.setRoles(roles);
         return userRepository.save(user);
+    }
+
+    public List<User> getAllUsers(){
+        return userRepository.findAllUsers().orElseThrow(() -> new RuntimeException("Trouble while retrieving the user list."));
     }
 }

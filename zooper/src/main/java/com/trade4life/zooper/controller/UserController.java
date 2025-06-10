@@ -1,8 +1,7 @@
 package com.trade4life.zooper.controller;
 
-import com.trade4life.zooper.dto.JwtResponse;
-import com.trade4life.zooper.dto.MessageResponse;
-import com.trade4life.zooper.dto.SignupRequest;
+import com.trade4life.zooper.dto.*;
+import com.trade4life.zooper.model.Role;
 import com.trade4life.zooper.model.User;
 import com.trade4life.zooper.security.JwtUtils;
 import com.trade4life.zooper.security.UserDetailsImpl;
@@ -10,12 +9,19 @@ import com.trade4life.zooper.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import com.trade4life.zooper.dto.LoginRequest;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/user")
@@ -45,20 +51,88 @@ public class UserController {
 
     @PostMapping("/auth/login")
     public ResponseEntity<?> userLogIn(@Valid @RequestBody LoginRequest loginRequest){
-        User user = userService.findByUsernameOrEmail(loginRequest.getUsernameOrEmail());
-        Authentication authentication = authenticationManager.authenticate( new UsernamePasswordAuthenticationToken(user.getUsername(), loginRequest.getPassword()));
+        try {
+            User user = userService.findByUsernameOrEmail(loginRequest.getUsernameOrEmail());
+            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(), loginRequest.getPassword()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(user.getUsername());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtils.generateJwtToken(user.getUsername());
 
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        return ResponseEntity.ok(new JwtResponse(jwt,
-                userDetails.getId(),
-                userDetails.getUsername(),
-                userDetails.getEmail()));
+            return ResponseEntity.ok(new JwtResponse(jwt,
+                    userDetails.getId(),
+                    userDetails.getUsername(),
+                    userDetails.getEmail(),
+                    userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList())));
+        } catch( Exception e){
+            return ResponseEntity.badRequest().body(new MessageResponse("Login failed: " + e.getMessage()));
+        }
 
     }
 
+    @PostMapping("/auth/logout")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> userLogout(){
+        //TODO:add blacklisting the token here
+        return ResponseEntity.ok(new MessageResponse("Logged out successfully!"));
+    }
+
+    @GetMapping("/profile")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserDetailsImpl userDetails){
+        List<String> roles = userDetails.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
+
+        return ResponseEntity.ok(new UserInfoResponse(userDetails.getId(), userDetails.getUsername(), userDetails.getEmail(), roles));
+    }
+
+
+    @GetMapping("/admin/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getUsersByAdmin(){
+        List<User> users = userService.getAllUsers();
+        List<UserInfoResponse> userInfoResponseList = new java.util.ArrayList<>(List.of());
+
+        for(User user : users){
+            List<String> roles = user.getRoles().stream().map(role -> role.getRoleName().toString()).toList();
+            userInfoResponseList.add(new UserInfoResponse(user.getId(), user.getUsername(), user.getEmail(), roles));
+        }
+
+        return ResponseEntity.ok(userInfoResponseList);
+    }
+
+    @DeleteMapping("/admin/users/{userId}/delete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteUserByAdmin(@PathVariable Long userId){
+        try{
+            userService.deleteUser(userId);
+            return ResponseEntity.ok(new MessageResponse("User deleted successfully, ID: " + userId));
+        } catch(RuntimeException e){
+            return ResponseEntity.badRequest().body(new MessageResponse("Uer could not be deleted: " + e.getMessage()));
+        }
+    }
+
+    // TODO: I should consider using username instead of ID here
+    @GetMapping("/admin/users/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getUserByAdmin(@PathVariable Long userId){
+        User user = userService.findByUserId(userId);
+
+        List<String> roles = user.getRoles().stream().map(role -> role.getRoleName().toString()).toList();
+
+        UserInfoResponse userInfoResponse = new UserInfoResponse(user.getId(),user.getUsername(),user.getEmail(),roles);
+
+        return ResponseEntity.ok(userInfoResponse);
+    }
+
+    @PostMapping("/admin/users/{userId}/roles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateUserRoles(@PathVariable Long userId, @Valid @RequestBody UpdateRolesRequest updateRolesRequest){
+        User user = userService.updateUserRoles(userId, updateRolesRequest.getRoles());
+
+        List<String> roles = user.getRoles().stream().map(role -> role.getRoleName().toString()).toList();
+
+        return ResponseEntity.ok(new UserInfoResponse(user.getId(),user.getUsername(),user.getEmail(),roles));
+    }
 }
