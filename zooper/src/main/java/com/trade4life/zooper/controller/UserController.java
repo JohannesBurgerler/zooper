@@ -5,6 +5,7 @@ import com.trade4life.zooper.model.Role;
 import com.trade4life.zooper.model.User;
 import com.trade4life.zooper.security.JwtUtils;
 import com.trade4life.zooper.security.UserDetailsImpl;
+import com.trade4life.zooper.service.TokenBlacklistService;
 import com.trade4life.zooper.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +31,9 @@ public class UserController {
 
     @Autowired
     AuthenticationManager authenticationManager;
+
+    @Autowired
+    TokenBlacklistService tokenBlacklistService ;
 
     @Autowired
     UserService userService;
@@ -74,9 +79,24 @@ public class UserController {
 
     @PostMapping("/auth/logout")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> userLogout(){
+    public ResponseEntity<?> userLogout(@RequestHeader("Authorization") String requestHeader){
         //TODO:add blacklisting the token here
-        return ResponseEntity.ok(new MessageResponse("Logged out successfully!"));
+
+        try {
+            if (StringUtils.hasText(requestHeader) && requestHeader.startsWith("Bearer ")) {
+                String jwtToken = requestHeader.substring(7);
+                tokenBlacklistService.blacklistToken(jwtToken);
+
+                SecurityContextHolder.clearContext();
+
+                return ResponseEntity.ok(new MessageResponse("Logged out successfully!"));
+            }
+            else {
+                return ResponseEntity.badRequest().body(new MessageResponse("Invalid request! No bearer token in header!"));
+            }
+        } catch(RuntimeException e){
+            return ResponseEntity.badRequest().body(new MessageResponse("Unable to blacklist token! Logout failed! error: " + e.getMessage()));
+        }
     }
 
     @GetMapping("/profile")

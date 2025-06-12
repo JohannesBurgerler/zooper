@@ -2,6 +2,7 @@ package com.trade4life.zooper.security;
 
 import com.nimbusds.jose.proc.SecurityContext;
 import com.trade4life.zooper.config.SecurityConfig;
+import com.trade4life.zooper.service.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +30,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private JwtUtils jwtUtils;
     @Autowired
     private UserDetailsServiceImpl userDetailsServiceImpl;
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
 
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
 
@@ -38,6 +41,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
             logger.debug("JWT Token parsed: {}", jwt != null ? "Token found" : "No token");
             if(jwt != null && jwtUtils.validateJwtToken(jwt)){
+
+                // Check if token is blacklisted
+                if (tokenBlacklistService.isTokenBlacklisted(jwt)) {
+                    logger.debug("Token is blacklisted: {}", jwt);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Token has been revoked");
+                    return;
+                }
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
                 logger.debug("Found user with token: {}", username);
                 UserDetails user = userDetailsServiceImpl.loadUserByUsernameOrEmail(username);
